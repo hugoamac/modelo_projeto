@@ -17,24 +17,22 @@ class Crud {
 
             case "ONLINE":
 
-		try{
-                $this->db = new PDO("mysql:host=" . HOST_ONLINE . ";dbname=" . DATABASE_ONLINE, USER_ONLINE, PASS_ONLINE);
-		)catch(PDOException $e){
+                try {
+                    $this->db = new PDO("mysql:host=" . HOST_ONLINE . ";dbname=" . DATABASE_ONLINE, USER_ONLINE, PASS_ONLINE);
+                } catch (PDOException $e) {
 
-			print "Erro:" . $e->getMessage . "<br/>";
-			die();
-	
-		}
+                    print "Erro:" . $e->getMessage . "<br/>";
+                    die();
+                }
                 break;
             default :
-			try{
-			                $this->db = new PDO("mysql:host=" . HOST . ";dbname=" . DATABASE, USER, PASS);
-			}catch(PDOException $e){
+                try {
+                    $this->db = new PDO("mysql:host=" . HOST . ";dbname=" . DATABASE, USER, PASS);
+                } catch (PDOException $e) {
 
-			print "Erro:" . $e->getMessage . "<br/>";
-			die();
-	
-				}
+                    print "Erro:" . $e->getMessage . "<br/>";
+                    die();
+                }
                 break;
         }
     }

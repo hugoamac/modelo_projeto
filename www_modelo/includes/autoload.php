@@ -5,10 +5,10 @@ error_reporting(E_ALL ^ E_NOTICE);
 session_start();
 
 define("BANCO", "LOCAL");
-define("HOST", "localhost");
-define("DATABASE", "paulo");
-define("USER", "root");
-define("PASS", "lordswxp");
+define("HOST", "xxxx");
+define("DATABASE", "xxxx");
+define("USER", "xxx");
+define("PASS", "xxx");
 
 function __autoload($class) {
 

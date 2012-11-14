@@ -58,7 +58,7 @@ class Auth {
     public function login() {
 
         $db = new Crud();
-        $db->table = $this->tablename;
+        $db->setTable($this->tablename);
 
         $where = array(
             $this->userCollum => $this->user,
@@ -67,10 +67,18 @@ class Auth {
 
         $data = $db->find($where);
 
+
+
         if ($data) {
 
+            if (key_exists($this->passCollum, $data)) {
+
+                unset($data[$this->passCollum]);
+            }
+
+            $objData = self::arr2obj($data);
             $this->session->createSession('userAuth', true);
-            $this->session->createSession('userData', $data);
+            $this->session->createSession('userData', $objData);
 
             return true;
         } else {
@@ -111,11 +119,24 @@ class Auth {
         }
     }
 
-    public function userData($name) {
+    public static function userData() {
 
-        $data = $this->session->selectSession('userData');
+        $self = self::getInstance();
 
-        return $data[$name];
+        $data = $self->session->selectSession('userData');
+
+        return $data;
+    }
+
+    private static function arr2obj($arr) {
+
+        $ob = new stdClass;
+        for ($i = 0; $i < count($arr); $i++) {
+            $obVar = key($arr);
+            $ob->$obVar = $arr[key($arr)];
+            next($arr);
+        }
+        return $ob;
     }
 
 }

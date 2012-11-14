@@ -5,7 +5,7 @@ class Crud {
     /**
      * Propriedade responsável por receber a tabela no pattern table data gateway
      * */
-    public $table;
+    protected $table;
 
     /**
      * Propriedade responsável por receber o objeto PDO
@@ -18,7 +18,7 @@ class Crud {
             case "ONLINE":
 
                 try {
-                    $this->db = new PDO("mysql:host=" . HOST_ONLINE . ";dbname=" . DATABASE_ONLINE, USER_ONLINE, PASS_ONLINE);
+                    $this->db = new PDO("mysql:host=" . HOST_ONLINE . ";dbname=" . DATABASE_ONLINE, USER_ONLINE, PASS_ONLINE, array(PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8'));
                 } catch (PDOException $e) {
 
                     print "Erro:" . $e->getMessage . "<br/>";
@@ -27,7 +27,7 @@ class Crud {
                 break;
             default :
                 try {
-                    $this->db = new PDO("mysql:host=" . HOST . ";dbname=" . DATABASE, USER, PASS);
+                    $this->db = new PDO("mysql:host=" . HOST . ";dbname=" . DATABASE, USER, PASS, array(PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8'));
                 } catch (PDOException $e) {
 
                     print "Erro:" . $e->getMessage . "<br/>";
@@ -35,6 +35,15 @@ class Crud {
                 }
                 break;
         }
+    }
+
+    public function __destruct() {
+        $this->closeDb();
+    }
+
+    public function closeDb() {
+
+        $this->db = NULL;
     }
 
     /**
@@ -46,30 +55,49 @@ class Crud {
         return $this->db;
     }
 
+    public function setTable($table) {
+
+        $this->table = $table;
+    }
+
     /**
      * Método responsável para inserir dados no banco<br/>
      * @param array $dados <p>os dados a serem inseridos</p>
      * @return <b>int</b> <p>Se os dados forem inseridos com sucesso
-     * ou <b> false </b> caso contrário.</p>     
+     * ou <b> false </b> caso contrário.</p>
      * */
     public function insert(Array $dados) {
 
+        self::__construct();
+
         foreach ($dados as $col => $val) {
-            if (!in_array($col, $this->describe()))
+            if (!in_array($col, $this->describe()) || empty($val))
                 unset($dados[$col]);
         }
 
         $cols = array_keys($dados);
         $vals = array_values($dados);
 
+        for ($i = 0; $i < count($vals); $i++) {
+            $bind[$i] = "?";
+        }
+
         $cols = implode(",", $cols);
-        $vals = "'" . implode("','", $vals) . "'";
+        $bind = implode(",", $bind);
+        //$vals = "'" . implode("','", $vals) . "'";
 
-        $sql = "INSERT INTO `{$this->table}` ({$cols}) VALUES ({$vals}) ";
+        $sql = "INSERT INTO `{$this->table}` ({$cols}) VALUES ({$bind}) ";
 
-        if ($this->db->query($sql))
-            return (int) $this->db->lastInsertId();
+        $stm = $this->db->prepare($sql);
 
+        if ($stm->execute($vals)) {
+
+            $rs = (int) $this->db->lastInsertId();
+            self::__destruct();
+
+            return $rs;
+        }
+        self::__destruct();
         return FALSE;
     }
 
@@ -77,29 +105,38 @@ class Crud {
      * Método responsável para recupera somente uma linha no banco.<br/>
      * @param array $where <p>com os critério coluna valor</p>
      * @return <b>array</b> Se os dados forem encontrados
-     * ou <b> FALSE </b> caso contrário.     
+     * ou <b> FALSE </b> caso contrário.
      * */
     public function find(Array $where) {
+
+        self::__construct();
 
         foreach ($where as $col => $val) {
             if (!in_array($col, $this->describe())) {
                 unset($where[$col]);
             } else {
-                $campos[] = "{$col} = '{$val}'";
+                //$campos[] = "{$col} = '{$val}'";
+                $campos[] = "{$col} = ?";
+                $bind[] = $val;
             }
         }
 
         $and = count($where) > 1 ? " and " : "";
+
         $where = "WHERE " . implode($and, $campos);
+
 
         $sql = " SELECT * FROM `{$this->table}` {$where} ";
 
 
         $q = $this->db->prepare($sql);
         $q->setFetchMode(PDO::FETCH_ASSOC);
-        $q->execute();
+        $q->execute($bind);
 
-        return $q->fetch();
+        $rs = $q->fetch();
+
+        self::__destruct();
+        return $rs;
     }
 
     /**
@@ -114,6 +151,7 @@ class Crud {
      * */
     public function findAll($where = array(), $operator = array(), $order = null, $limit = null, $offset = null) {
 
+        self::__construct();
 
         if (count($where) > 0) {
             foreach ($where as $col => $val) {
@@ -122,9 +160,13 @@ class Crud {
                 } else {
 
                     if (isset($operator[$col])) {
-                        $campos[] = "{$col} {$operator[$col]} '{$val}'";
+                        //$campos[] = "{$col} {$operator[$col]} '{$val}'";
+                        $campos[] = "{$col} {$operator[$col]} ?";
+                        $bind[] = $val;
                     } else {
-                        $campos[] = "{$col} = '{$val}'";
+                        //$campos[] = "{$col} = '{$val}'";
+                        $campos[] = "{$col} = ?";
+                        $bind[] = $val;
                     }
                 }
             }
@@ -140,13 +182,13 @@ class Crud {
 
         $sql = " SELECT * FROM `{$this->table}` {$where} {$orderby} {$limit} {$offset} ";
 
-
-
         $q = $this->db->prepare($sql);
         $q->setFetchMode(PDO::FETCH_ASSOC);
-        $q->execute();
+        $q->execute($bind);
+        $rs = $q->fetchAll();
 
-        return $q->fetchAll();
+        self::__destruct();
+        return $rs;
     }
 
     /**
@@ -158,7 +200,18 @@ class Crud {
      * ou <b> FALSE </b> caso contrário.
      * */
     public function update(Array $dados, Array $where, $operator = array()) {
+        self::__construct();
 
+        $i = 1;
+        foreach ($dados as $ind => $val) {
+            if (!in_array($ind, $this->describe())) {
+                unset($dados[$ind]);
+            } else {
+                //$campos[] = "{$ind} = '{$val}'";
+                $campos[] = "{$ind} = ?";
+                $bind[$i++] = $val;
+            }
+        }
 
         foreach ($where as $col => $val) {
             if (!in_array($col, $this->describe())) {
@@ -166,9 +219,13 @@ class Crud {
             } else {
 
                 if (isset($operator[$col])) {
-                    $campos_where[] = "{$col} {$operator[$col]} '{$val}'";
+                    //$campos_where[] = "{$col} {$operator[$col]} '{$val}'";
+                    $campos_where[] = "{$col} {$operator[$col]} ?";
+                    $bind[$i++] = $val;
                 } else {
-                    $campos_where[] = "{$col} = '{$val}'";
+                    //$campos_where[] = "{$col} = '{$val}'";
+                    $campos_where[] = "{$col} = ?";
+                    $bind[$i++] = $val;
                 }
             }
         }
@@ -176,23 +233,22 @@ class Crud {
         $and = count($where) > 1 ? " and " : "";
         $where = "WHERE " . implode($and, $campos_where);
 
-        foreach ($dados as $ind => $val) {
-            if (!in_array($ind, $this->describe())) {
-
-
-                unset($dados[$ind]);
-            } else {
-                $campos[] = "{$ind} = '{$val}'";
-            }
-        }
 
         $campos = implode(", ", $campos);
 
         $sql = " UPDATE `{$this->table}` SET {$campos}  {$where} ";
 
+        $stm = $this->db->prepare($sql);
 
 
-        return $this->db->query($sql);
+        foreach ($bind as $simbolo => $valor) {
+            $stm->bindValue($simbolo, $valor);
+        }
+
+        $rm = $stm->execute();
+        self::__destruct();
+
+        return $rm;
     }
 
     /**
@@ -204,14 +260,19 @@ class Crud {
      * */
     public function delete(Array $where, $operator = array()) {
 
+        self::__construct();
         foreach ($where as $col => $val) {
             if (!in_array($col, $this->describe())) {
                 unset($where[$col]);
             } else {
                 if (isset($operator[$col])) {
-                    $campos_where[] = "{$col} {$operator[$col]} '{$val}'";
+                    //$campos_where[] = "{$col} {$operator[$col]} '{$val}'";
+                    $campos_where[] = "{$col} {$operator[$col]} ?";
+                    $bind[] = $val;
                 } else {
-                    $campos_where[] = "{$col} = '{$val}'";
+                    //$campos_where[] = "{$col} = '{$val}'";
+                    $campos_where[] = "{$col} = ?";
+                    $bind[] = $val;
                 }
             }
         }
@@ -221,9 +282,20 @@ class Crud {
 
         $sql = " DELETE FROM `{$this->table}`  {$where} ";
 
+        $stm = $this->db->prepare($sql);
 
+        $stm->execute($bind);
 
-        return $this->db->query($sql);
+        if ($stm->rowCount() > 0) {
+
+            self::__destruct();
+
+            return TRUE;
+        }
+
+        self::__destruct();
+
+        return FALSE;
     }
 
     /**
@@ -232,9 +304,10 @@ class Crud {
      * */
     private function describe() {
 
-        $sql = "describe {$this->table}";
 
+        $sql = "describe {$this->table}";
         $q = $this->db->prepare($sql);
+
         $q->setFetchMode(PDO::FETCH_ASSOC);
         $q->execute();
         $vvDescribe = $q->fetchAll();

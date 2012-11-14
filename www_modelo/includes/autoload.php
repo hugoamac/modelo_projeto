@@ -1,21 +1,14 @@
 <?php
 
+error_reporting(E_ALL ^ E_NOTICE);
+
 session_start();
 
-/*Para acesso Local*/
 define("BANCO", "LOCAL");
 define("HOST", "localhost");
-define("DATABASE", "nome do banco");
-define("USER", "nome do usuario");
-define("PASS", "senha do banco");
-
-/*Para acesso onlilne*/
-/*
-define("BANCO", "ONLINE");
-define("HOST_ONLINE", "localhost");
-define("DATABASE_ONLINE", "nome do banco");
-define("USER_ONLINE", "nome do usuario");
-define("PASS_ONLINE", "senha do banco");*/
+define("DATABASE", "paulo");
+define("USER", "root");
+define("PASS", "lordswxp");
 
 function __autoload($class) {
 
@@ -28,4 +21,8 @@ function __autoload($class) {
     }
 }
 
+
+$excessao = array();
+$_POST = Helper::filtroHTTP($_POST,$excessao);
+$_GET = Helper::filtroHTTP($_GET,$excessao);
 ?>
